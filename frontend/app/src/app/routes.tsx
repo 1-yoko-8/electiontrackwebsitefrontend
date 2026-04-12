@@ -6,6 +6,7 @@ import UploadDataset from "./pages/UploadDataset";
 import ViewDataset from "./pages/ViewDataset";
 import { TaskDay } from "./pages/TaskDay";
 import ExportData from "./pages/ExportData";
+import MapTracking from "./pages/MapTracking";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "dataset", element: <ViewDataset /> },
       { path: "task-day", element: <TaskDay /> },
       { path: "export", element: <ExportData /> },
+      { path: "map-tracking", element: <MapTracking /> }
     ],
   },
 ]);

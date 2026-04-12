@@ -1,12 +1,13 @@
 import * as React from "react";
 import { useState } from "react";
-import { Calendar } from "lucide-react";
-import { Download } from "lucide-react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import {
   LayoutDashboard,
-  Upload,
-  Database,
+  MapPin,
+  Download,
+  Shield,
+  Activity,
+  AlertTriangle,
   LogOut,
   Menu,
   X
@@ -15,6 +16,7 @@ import { sidebarMenuButtonVariants } from "./ui/sidebar-variants";
 import { Button } from "./ui/button";
 
 /* ---------------- SIDE BAR COMPONENT ---------------- */
+
 interface MenuItem {
   icon: React.ElementType;
   label: string;
@@ -40,9 +42,10 @@ function Sidebar({ menuItems }: SidebarProps) {
       <div className="p-4 flex items-center justify-between border-b">
         {sidebarOpen && (
           <h1 className="text-xl font-semibold text-gray-800 font-inter">
-            Field Tracker
+            Mobile Tracker
           </h1>
         )}
+
         <Button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -59,20 +62,20 @@ function Sidebar({ menuItems }: SidebarProps) {
       <nav className="flex-1 p-4 space-y-2">
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path;
+
           return (
             <Button
               key={item.path}
               onClick={() => navigate(item.path)}
-              className={sidebarMenuButtonVariants({
-                variant: isActive ? "outline" : "default",
-                size: sidebarOpen ? "default" : "sm"
-              })}
+              className={
+                sidebarMenuButtonVariants({
+                  variant: isActive ? "outline" : "default",
+                  size: sidebarOpen ? "default" : "sm"
+                }) + " justify-start px-3"
+              }
             >
-              <item.icon
-                className={`w-5 h-5 shrink-0 ${
-                  sidebarOpen ? "mr-3" : "mx-auto"
-                } text-gray-700`}
-              />
+              <item.icon className="w-5 h-5 shrink-0 mr-3 text-gray-700" />
+
               {sidebarOpen && (
                 <span className="font-inter font-medium text-gray-800">
                   {item.label}
@@ -87,12 +90,14 @@ function Sidebar({ menuItems }: SidebarProps) {
 }
 
 /* ---------------- DASHBOARD LAYOUT ---------------- */
+
 const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Upload, label: "Upload Dataset", path: "/upload" },
-  { icon: Database, label: "View/Edit Dataset", path: "/dataset" },
-  { icon: Calendar, label: "Set Task Day", path: "/task-day" },
-  { icon: Download, label: "Export Data", path: "/export" }
+  { icon: MapPin, label: "Map Tracking", path: "/map-tracking" },
+  { icon: Download, label: "Export Reports", path: "/export" },
+  { icon: Shield, label: "Admin", path: "/admin" },
+  { icon: Activity, label: "Polling Status", path: "/polling-status" },
+  { icon: AlertTriangle, label: "SOS", path: "/sos" }
 ];
 
 export function DashboardLayout() {
@@ -109,11 +114,13 @@ export function DashboardLayout() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
+
         {/* Top Bar */}
         <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between">
-          <h2 className="text-26xl font-semibold text-gray-800 font-inter">
-            Admin Panel
+          <h2 className="text-2xl font-semibold text-gray-800 font-inter">
+            Police Mobile Party Tracker
           </h2>
+
           <Button
             onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
@@ -127,6 +134,7 @@ export function DashboardLayout() {
         <main className="flex-1 overflow-auto p-6">
           <Outlet />
         </main>
+
       </div>
     </div>
   );

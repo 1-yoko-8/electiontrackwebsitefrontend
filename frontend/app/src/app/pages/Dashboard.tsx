@@ -1,248 +1,310 @@
-import { useState, useEffect } from "react"
-import { Users, MapPin, CheckCircle, Package } from "lucide-react"
-import { WorkerMap } from "../components/WorkerMap"
+import { useState, useEffect } from "react";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent
-} from "../components/ui/cards"
-import api from "../../api/axios"
+  MapPin,
+  TrendingUp,
+  Package,
+  Truck,
+  CheckCircle,
+} from "lucide-react";
+import api from "../../api/axios";
 
-/* ---------------- STAT CARD COMPONENT ---------------- */
+/* ---------------- TYPES ---------------- */
 
-interface ProgressData {
-  collected: { total: number; completed: number; pending: number }
-  started: { total: number; completed: number; pending: number }
-  reached: { totalLocations: number; covered: number; pending: number }
-  handedOver: { total: number; completed: number; pending: number }
+interface DistrictDetails {
+  totalPollingLocations: number;
+  totalPollingStations: number;
+  totalMobileParties: number;
+  totalBallotBoxes: number;
 }
 
-interface StatCardProps {
-  title: string
-  icon: React.ElementType
-  total: number
-  completed: number
-  pending: number
-  color: {
-  bg: string
-  icon: string
-  progress: string
-  }
+interface PollingStatus {
+  collectedAndDeparted: number;
+  ballotBoxesCollected: number;
+  partiesInTransit: number;
+  partiesReached: number;
+  ballotBoxesHandedOver: number;
 }
 
-function StatCard({
-  title,
-  icon: Icon,
-  total,
-  completed,
-  pending,
-  color
-}: StatCardProps) {
+interface DashboardResponse {
+  districtDetails: DistrictDetails;
+  dayBeforeStatus: PollingStatus;
+  pollingDayStatus: PollingStatus;
+}
 
-  const percent = total === 0 ? 0 : Math.round((completed / total) * 100)
+type ColorType = "blue" | "green" | "purple" | "orange" | "indigo";
 
-  return (
-    <Card className="hover:shadow-md transition-all duration-200 group">
+/* ---------------- COLORS (TAILWIND SAFE) ---------------- */
 
-      <CardHeader className="flex items-center justify-between">
+const colorClasses = {
+  blue: {
+    bg: "bg-blue-100",
+    text: "text-blue-600",
+  },
+  green: {
+    bg: "bg-green-100",
+    text: "text-green-600",
+  },
+  purple: {
+    bg: "bg-purple-100",
+    text: "text-purple-600",
+  },
+  orange: {
+    bg: "bg-orange-100",
+    text: "text-orange-600",
+  },
+  indigo: {
+    bg: "bg-indigo-100",
+    text: "text-indigo-600",
+  },
+};
 
-        {/* ICON */}
-        <div className={`p-3 rounded-xl shadow-inner ${color.bg}`}>
-        <Icon className={`w-6 h-6 ${color.icon}`} />
-        </div>
+/* ---------------- DEFAULTS ---------------- */
 
-        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          {title}
-        </span>
+const defaultDistrict: DistrictDetails = {
+  totalPollingLocations: 0,
+  totalPollingStations: 0,
+  totalMobileParties: 0,
+  totalBallotBoxes: 0,
+};
 
-      </CardHeader>
+const defaultStatus: PollingStatus = {
+  collectedAndDeparted: 0,
+  ballotBoxesCollected: 0,
+  partiesInTransit: 0,
+  partiesReached: 0,
+  ballotBoxesHandedOver: 0,
+};
 
-      <CardContent className="space-y-3">
+/* ---------------- CARD PROPS ---------------- */
 
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Total</span>
-          <span className="font-semibold text-gray-900">{total}</span>
-        </div>
+interface CardProps {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  color: ColorType;
+  loading: boolean;
+}
 
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Completed</span>
-          <span className="font-semibold text-green-600">{completed}</span>
-        </div>
+/* ---------------- STATUS SECTION PROPS ---------------- */
 
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Pending</span>
-          <span className="font-semibold text-orange-500">{pending}</span>
-        </div>
-
-        {/* PROGRESS BAR */}
-        <div className="pt-3 border-t">
-
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-500">Progress</span>
-            <span className="font-medium">{percent}%</span>
-          </div>
-
-          <div className="w-full bg-gray-200 rounded-full h-2">
-
-          <div className={`h-2 rounded-full transition-all duration-500 ${color.progress}`}
-              style={{ width: `${percent}%` }}
-            />
-
-          </div>
-
-        </div>
-
-      </CardContent>
-
-    </Card>
-  )
+interface StatusSectionProps {
+  title: string;
+  data: PollingStatus;
+  loading: boolean;
 }
 
 /* ---------------- DASHBOARD ---------------- */
 
 export default function Dashboard() {
+  const [districtDetails, setDistrictDetails] =
+    useState<DistrictDetails>(defaultDistrict);
 
-const [progressData, setProgressData] = useState<ProgressData | null>(null);
+  const [dayBeforeStatus, setDayBeforeStatus] =
+    useState<PollingStatus>(defaultStatus);
 
-useEffect(() => {
+  const [pollingDayStatus, setPollingDayStatus] =
+    useState<PollingStatus>(defaultStatus);
 
-  const fetchData = async () => {
-    try {
-      const res = await api.get("/admin/progress")
-      setProgressData(res.data)
-    } catch (err) {
-      console.error("Error fetching progress:", err)
-    }
-  }
+  const [loading, setLoading] = useState(true);
 
-  fetchData() // initial load
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await api.get<DashboardResponse>("/admin/dashboard");
 
-  const interval = setInterval(fetchData, 5000)
+        if (res.data) {
+          setDistrictDetails(res.data.districtDetails ?? defaultDistrict);
+          setDayBeforeStatus(res.data.dayBeforeStatus ?? defaultStatus);
+          setPollingDayStatus(res.data.pollingDayStatus ?? defaultStatus);
+        }
+      } catch (err) {
+        console.error("API failed:", err);
+        setDistrictDetails(defaultDistrict);
+        setDayBeforeStatus(defaultStatus);
+        setPollingDayStatus(defaultStatus);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  return () => clearInterval(interval)
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-}, [])
-
-
-if (!progressData) {
   return (
-    <div className="p-6 text-gray-500">
-      Loading dashboard...
-    </div>
-  )
-}
-
-  return (
-
-    <div className="p-6 lg:p-8 space-y-8">
+    <div className="space-y-8 p-6">
 
       {/* HEADER */}
-
-      <div className="flex items-center justify-between">
-
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Dashboard
-          </h1>
-
-          <p className="text-gray-500 mt-1">
-            Monitor field worker progress in real-time
-          </p>
-        </div>
-
-        <div className="text-sm text-gray-500">
-          Live Updates • Every 5s
-        </div>
-
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          Dashboard
+        </h1>
+        <p className="text-gray-600">
+          Monitor polling operations in real-time
+        </p>
       </div>
 
-      {/* PROGRESS CARDS */}
+      {/* DISTRICT DETAILS */}
+      <div>
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+          District Overview
+        </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
 
-        <StatCard
-          title="Collected"
-          icon={Package}
-          total={progressData.collected.total}
-          completed={progressData.collected.completed}
-          pending={progressData.collected.pending}
-          color={{
-            bg: "bg-blue-100",
-            icon: "text-blue-600",
-            progress: "bg-blue-600"
-          }}
-        />
+          <Card
+            icon={MapPin}
+            label="Total Polling Locations"
+            value={districtDetails.totalPollingLocations}
+            color="blue"
+            loading={loading}
+          />
 
-        <StatCard
-          title="Started"
-          icon={Users}
-          total={progressData.started.total}
-          completed={progressData.started.completed}
-          pending={progressData.started.pending}
-          color={{
-          bg: "bg-purple-100",
-          icon: "text-purple-600",
-          progress: "bg-purple-600"
-        }}
-        />
+          <Card
+            icon={TrendingUp}
+            label="Total Polling Stations"
+            value={districtDetails.totalPollingStations}
+            color="green"
+            loading={loading}
+          />
 
-        <StatCard
-          title="Reached"
-          icon={MapPin}
-          total={progressData.reached.totalLocations}
-          completed={progressData.reached.covered}
-          pending={progressData.reached.pending}
-          color={{
-          bg: "bg-green-100",
-          icon: "text-green-600",
-          progress: "bg-green-600"
-        }}
-        />
+          <Card
+            icon={Truck}
+            label="Total Mobile Parties"
+            value={districtDetails.totalMobileParties}
+            color="purple"
+            loading={loading}
+          />
 
-        <StatCard
-          title="Handed Over"
-          icon={CheckCircle}
-          total={progressData.handedOver.total}
-          completed={progressData.handedOver.completed}
-          pending={progressData.handedOver.pending}
-          color={{
-          bg: "bg-orange-100",
-          icon: "text-orange-600",
-          progress: "bg-orange-600"
-        }}
-        />
+          <Card
+            icon={Package}
+            label="Total Ballot Boxes"
+            value={districtDetails.totalBallotBoxes}
+            color="indigo"
+            loading={loading}
+          />
 
+        </div>
       </div>
 
-      {/* LIVE MAP */}
+      {/* DAY BEFORE */}
+      <StatusSection
+        title="Day Before Polling Status"
+        data={dayBeforeStatus}
+        loading={loading}
+      />
 
-      <Card className="mb-6">
-
-        <CardHeader className="flex items-center justify-between">
-
-          <CardTitle>
-            Live Worker Tracking
-          </CardTitle>
-
-          <span className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full">
-            Live
-          </span>
-
-        </CardHeader>
-
-        <CardContent className="p-4">
-
-          <div className="rounded-b-xl overflow-hidden p-4">
-            <WorkerMap />
-          </div>
-          <div className="h-6">
-          </div>
-
-        </CardContent>
-
-      </Card>
+      {/* POLLING DAY */}
+      <StatusSection
+        title="Polling Day Status"
+        data={pollingDayStatus}
+        loading={loading}
+      />
 
     </div>
-  )
+  );
+}
+
+/* ---------------- CARD COMPONENT ---------------- */
+
+function Card({
+  icon: Icon,
+  label,
+  value,
+  color,
+  loading,
+}: CardProps) {
+  const styles = colorClasses[color];
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+      <div className={`p-3 w-fit mb-4 rounded-lg ${styles.bg}`}>
+        <Icon className={`w-6 h-6 ${styles.text}`} />
+      </div>
+
+      <div className="text-center">
+        <p className="text-sm text-gray-600 mb-2">{label}</p>
+
+        <p className="text-4xl font-bold text-gray-900">
+          {loading ? "—" : value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- STATUS SECTION ---------------- */
+
+function StatusSection({
+  title,
+  data,
+  loading,
+}: StatusSectionProps) {
+  const items = [
+    {
+      label: "Mobile Parties Collected & Departed",
+      value: data.collectedAndDeparted,
+      icon: Package,
+      color: "blue" as ColorType,
+    },
+    {
+      label: "Ballot Boxes Collected",
+      value: data.ballotBoxesCollected,
+      icon: Package,
+      color: "green" as ColorType,
+    },
+    {
+      label: "Mobile Parties in Transit",
+      value: data.partiesInTransit,
+      icon: Truck,
+      color: "orange" as ColorType,
+    },
+    {
+      label: "Mobile Parties Reached & Handed Over",
+      value: data.partiesReached,
+      icon: MapPin,
+      color: "purple" as ColorType,
+    },
+    {
+      label: "Ballot Boxes Handed Over",
+      value: data.ballotBoxesHandedOver,
+      icon: CheckCircle,
+      color: "indigo" as ColorType,
+    },
+  ];
+
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        {title}
+      </h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {items.map((item, idx) => {
+          const styles = colorClasses[item.color];
+
+          return (
+            <div
+              key={idx}
+              className="bg-white rounded-xl shadow-sm p-5 border"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`p-2 rounded-lg ${styles.bg}`}>
+                  <item.icon className={`w-5 h-5 ${styles.text}`} />
+                </div>
+                <p className="text-xs text-gray-600">
+                  {item.label}
+                </p>
+              </div>
+
+              <p className="text-3xl font-bold text-gray-900">
+                {loading ? "—" : item.value}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
