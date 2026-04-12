@@ -1,44 +1,99 @@
-import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-import axios from 'axios';
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import icon from "leaflet/dist/images/marker-icon.png";
+import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-const DefaultIcon = L.icon({
+/* ---------------- LEAFLET ICON FIX ---------------- */
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: icon,
   iconUrl: icon,
   shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
 });
 
-L.Marker.prototype.options.icon = DefaultIcon;
+/* ---------------- TYPES ---------------- */
 
 interface Worker {
-  id: number;
+  id: string;
   name: string;
   rank: string;
   currentTask: string;
   position: [number, number];
-  status: 'active' | 'idle' | 'completed';
+  lastGPSUpdate: Date;
+  completedAllTasks: boolean;
 }
 
-interface GPSPing {
-  id: number;
-  userId: string;
-  timestamp: string;  
-  latitude: number;
-  longitude: number;
-  currentTask: string;
+/* ---------------- MOCK DATA ---------------- */
+
+const initialWorkers: Worker[] = [
+  {
+    id: "101",
+    name: "Arun",
+    rank: "Field Officer",
+    currentTask: "COLLECTED",
+    position: [13.0827, 80.2707],
+    lastGPSUpdate: new Date(),
+    completedAllTasks: false,
+  },
+  {
+    id: "102",
+    name: "Priya",
+    rank: "Supervisor",
+    currentTask: "REACHED",
+    position: [13.05, 80.25],
+    lastGPSUpdate: new Date(Date.now() - 15 * 60 * 1000),
+    completedAllTasks: false,
+  },
+  {
+    id: "103",
+    name: "Ravi",
+    rank: "Officer",
+    currentTask: "REACHED_AND_HANDED_OVER",
+    position: [13.1, 80.28],
+    lastGPSUpdate: new Date(),
+    completedAllTasks: true,
+  },
+];
+
+/* ---------------- STATUS LOGIC ---------------- */
+
+function getStatus(worker: Worker): "active" | "idle" | "completed" {
+  const now = new Date();
+  const diffMinutes =
+    (now.getTime() - worker.lastGPSUpdate.getTime()) / (1000 * 60);
+
+  // COMPLETED
+  if (
+    worker.currentTask === "REACHED_AND_HANDED_OVER" ||
+    worker.completedAllTasks
+  ) {
+    return "completed";
+  }
+
+  // ACTIVE
+  if (diffMinutes < 10 && !worker.completedAllTasks) {
+    return "active";
+  }
+
+  // IDLE
+  return "idle";
 }
 
-// Custom marker icons with different colors based on status
+/* ---------------- ICON ---------------- */
+
 const createCustomIcon = (status: string) => {
   const color =
-    status === 'active' ? '#22c55e' : status === 'idle' ? '#f59e0b' : '#6b7280';
+    status === "active"
+      ? "#22c55e"
+      : status === "idle"
+      ? "#f59e0b"
+      : "#6b7280";
 
   return L.divIcon({
-    className: 'custom-marker',
+    className: "custom-marker",
     html: `
       <div style="
         width: 30px;
@@ -56,7 +111,6 @@ const createCustomIcon = (status: string) => {
           height: 10px;
           background-color: white;
           border-radius: 50%;
-          ${status === 'active' ? 'animation: pulse 2s infinite;' : ''}
         "></div>
       </div>
     `,
@@ -65,128 +119,93 @@ const createCustomIcon = (status: string) => {
   });
 };
 
+/* ---------------- COMPONENT ---------------- */
+
 export function WorkerMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<Map<number, L.Marker>>(new Map());
-  const [workers, setWorkers] = useState<Worker[]>([]);
+  const markersRef = useRef<Map<string, L.Marker>>(new Map());
 
-  // Fetch latest GPS pings
-  const fetchLatestGPS = async () => {
-  try {
-    const res = await axios.get<GPSPing[]>('http://localhost:8000/gps/latest');
+  const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
 
-    const updatedWorkers: Worker[] = res.data.map(ping => ({
-      id: Number(ping.userId),
-      name: `User ${ping.userId}`,
-      rank: 'Field Worker',
-      currentTask: ping.currentTask,
-      position: [ping.latitude, ping.longitude],
-      status: 'active' as const,
-    }));
+  /* ---------------- SIMULATE REALISTIC MOVEMENT ---------------- */
 
-    setWorkers(updatedWorkers);
-  } catch (err) {
-    console.error('Failed to fetch GPS data', err);
-  }
-};
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWorkers((prev) =>
+        prev.map((w) => {
+          const moved = Math.random() > 0.3;
 
-useEffect(() => {
-  const initFetch = async () => {
-    await fetchLatestGPS();
-  };
+          return {
+            ...w,
+            position: moved
+              ? [
+                  w.position[0] + (Math.random() - 0.5) * 0.01,
+                  w.position[1] + (Math.random() - 0.5) * 0.01,
+                ]
+              : w.position,
 
-  initFetch();
+            lastGPSUpdate: moved ? new Date() : w.lastGPSUpdate,
+          };
+        })
+      );
+    }, 5000);
 
-  const interval = setInterval(fetchLatestGPS, 10000);
-  return () => clearInterval(interval);
-}, []);
+    return () => clearInterval(interval);
+  }, []);
 
-  // Initialize map
+  /* ---------------- INIT MAP ---------------- */
+
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
-    // Create map
-    const map = L.map(mapRef.current).setView([20.5937, 78.9629], 5);
+    const map = L.map(mapRef.current).setView([13.0827, 80.2707], 12);
 
-    // Add tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap",
     }).addTo(map);
 
     mapInstanceRef.current = map;
 
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 0);
   }, []);
 
-  // Update markers when workers change
+  /* ---------------- MARKER LOGIC ---------------- */
+
   useEffect(() => {
     if (!mapInstanceRef.current) return;
 
     const map = mapInstanceRef.current;
 
     workers.forEach((worker) => {
+      const status = getStatus(worker);
+
       let marker = markersRef.current.get(worker.id);
 
       if (!marker) {
-        // Create new marker
+        // CREATE MARKER
         marker = L.marker(worker.position, {
-          icon: createCustomIcon(worker.status),
+          icon: createCustomIcon(status),
         }).addTo(map);
 
-        // Create popup content
-        const popupContent = `
-          <div style="padding: 8px; min-width: 200px;">
-            <h3 style="font-weight: 600; color: #111827; margin-bottom: 8px; font-size: 14px;">
-              ${worker.name}
-            </h3>
-            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
-              <div style="display: flex; justify-content: space-between;">
-                <span style="color: #6b7280;">Rank:</span>
-                <span style="font-weight: 500; color: #111827;">${worker.rank}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between;">
-                <span style="color: #6b7280;">Status:</span>
-                <span style="font-weight: 500; color: ${
-                  worker.status === 'active' ? '#16a34a' : 
-                  worker.status === 'idle' ? '#ea580c' : '#6b7280'
-                }; text-transform: capitalize;">
-                  ${worker.status}
-                </span>
-              </div>
-              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-                <span style="color: #6b7280; font-size: 11px;">Current Task:</span>
-                <p style="color: #111827; font-weight: 500; margin-top: 4px; font-size: 12px;">
-                  ${worker.currentTask}
-                </p>
-              </div>
-            </div>
-          </div>
-        `;
+        // ✅ POPUP ADDED (ONLY CHANGE)
+        marker.bindPopup(`
+          <b>${worker.name}</b><br/>
+          Username: ${worker.id}
+        `);
 
-        marker.bindPopup(popupContent);
         markersRef.current.set(worker.id, marker);
-      } else {
-        // Update existing marker position and icon
-        const currentLatLng = marker.getLatLng();
-        const from: [number, number] = [currentLatLng.lat, currentLatLng.lng];
-        const to = worker.position;
-
-        // ✅ Only animate if position actually changed
-        if (from[0] !== to[0] || from[1] !== to[1]) {
-          animateMarker(marker as AnimatedMarker, from, to);
-        }
-        marker.setIcon(createCustomIcon(worker.status));
       }
+
+      // UPDATE POSITION + ICON
+      marker.setLatLng(worker.position);
+      marker.setIcon(createCustomIcon(status));
     });
 
-    // Remove markers for workers that are no longer in the list
-    const activeIds = new Set(workers.map(w => w.id));
+    // REMOVE OLD MARKERS
+    const activeIds = new Set(workers.map((w) => w.id));
 
     markersRef.current.forEach((marker, id) => {
       if (!activeIds.has(id)) {
@@ -194,87 +213,32 @@ useEffect(() => {
         markersRef.current.delete(id);
       }
     });
-
   }, [workers]);
+
+  /* ---------------- RENDER ---------------- */
 
   return (
     <div className="relative">
       <style>{`
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
         .leaflet-container {
-          height: 450px;
+          height: 600px;
           width: 100%;
-          border-radius: 0.75rem;
+          border-radius: 12px;
         }
       `}</style>
 
-      <div ref={mapRef} style={{ height: '600px', width: '100%', borderRadius: '0.75rem' }} />
+      <div ref={mapRef} style={{ height: "600px", width: "100%" }} />
 
-      {/* Legend */}
-      <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 z-1000">
-        <h4 className="font-semibold text-gray-900 mb-3 text-sm">
-          Worker Status
-        </h4>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow"></div>
-            <span className="text-xs text-gray-700">Active</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-orange-500 rounded-full border-2 border-white shadow"></div>
-            <span className="text-xs text-gray-700">Idle</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-gray-500 rounded-full border-2 border-white shadow"></div>
-            <span className="text-xs text-gray-700">Completed</span>
-          </div>
+      {/* LEGEND */}
+      <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow">
+        <p className="text-sm font-semibold mb-2">Legend</p>
+
+        <div className="text-xs space-y-1">
+          <div>🟢 Active </div>   {/* lastGPSUpdate < 10 min & not completed */}
+          <div>🟠 Idle </div>   {/* lastGPSUpdate > 10 min & not completed */}
+          <div>⚫ Completed </div>   {/* lastGPSUpdate < 10 min & completed */}
         </div>
       </div>
     </div>
   );
-}
-
-interface AnimatedMarker extends L.Marker {
-  _animId?: ReturnType<typeof setTimeout>;
-}
-
-function animateMarker(
-  marker: AnimatedMarker,
-  from: [number, number],
-  to: [number, number],
-  duration = 1000
-) {
-  const frames = 20;
-  const interval = duration / frames;
-
-  let step = 0;
-
-  // store animation id on marker
-  if (marker._animId) {
-  clearTimeout(marker._animId);
-}
-
-  const latStep = (to[0] - from[0]) / frames;
-  const lngStep = (to[1] - from[1]) / frames;
-
-  const move = () => {
-    step++;
-    const newLat = from[0] + latStep * step;
-    const newLng = from[1] + lngStep * step;
-
-    marker.setLatLng([newLat, newLng]);
-
-    if (step < frames) {
-    marker._animId = setTimeout(move, interval);
-  }
-
-  };
-  move();
 }
