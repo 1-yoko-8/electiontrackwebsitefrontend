@@ -1,61 +1,50 @@
 import { useState, useMemo } from "react";
 import axios from "axios";
-import {
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Edit2,
-  Save,
-  X
-} from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 /* ---------------- TYPES ---------------- */
 interface DataRow {
   id: number;
-  workerId: string;
+  workerId: string; // username
   name: string;
   rank: string;
-  location: string;
   contact: string;
-  status: string;
+
+  ballotCollected: string;
+  collectedTimestamp: string;
+
+  handedOver: string;
+  handedOverTimestamp: string;
+
+  location: string;
 }
 
 /* ---------------- MOCK DATA ---------------- */
 const generateMockData = (): DataRow[] => {
-  const ranks = ["Senior Officer", "Officer", "Field Agent", "Assistant", "Supervisor"];
-  const locations = [
-    "Downtown District",
-    "North Zone",
-    "South Zone",
-    "East Sector",
-    "West Sector",
-    "Central Area",
-    "Harbor District",
-    "Industrial Zone"
-  ];
-  const statuses = ["Active", "In Progress", "Completed", "Pending"];
+  const ranks = ["Senior Officer", "Officer", "Field Agent", "Assistant"];
 
   return Array.from({ length: 50 }, (_, i) => ({
     id: i + 1,
     workerId: `FW${String(i + 1).padStart(4, "0")}`,
     name: `Worker ${i + 1}`,
     rank: ranks[Math.floor(Math.random() * ranks.length)],
-    location: locations[Math.floor(Math.random() * locations.length)],
-    contact: `+1-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`,
-    status: statuses[Math.floor(Math.random() * statuses.length)]
+    contact: `+91-9${Math.floor(Math.random() * 900000000 + 100000000)}`,
+
+    ballotCollected: Math.random() > 0.5 ? "Yes" : "No",
+    collectedTimestamp: new Date().toLocaleString(),
+
+    handedOver: Math.random() > 0.5 ? "Yes" : "No",
+    handedOverTimestamp: new Date().toLocaleString(),
+
+    location: "View on Map",
   }));
 };
 
-/* Only these fields are editable */
-const editableFields: (keyof DataRow)[] = [
-  "name",
-  "rank",
-  "location",
-  "contact"
-];
-
 /* ---------------- COMPONENT ---------------- */
 export default function ExportData() {
+  const navigate = useNavigate();
+
   /* -------- EXPORT -------- */
   const [selectedDate, setSelectedDate] = useState("");
 
@@ -93,11 +82,9 @@ export default function ExportData() {
   };
 
   /* -------- TABLE STATE -------- */
-  const [data, setData] = useState<DataRow[]>(generateMockData());
+  const [data] = useState<DataRow[]>(generateMockData());
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editedRow, setEditedRow] = useState<DataRow | null>(null);
 
   const itemsPerPage = 10;
 
@@ -117,37 +104,6 @@ export default function ExportData() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  /* -------- EDIT HANDLERS -------- */
-  const handleEdit = (row: DataRow) => {
-    setEditingId(row.id);
-    setEditedRow({ ...row });
-  };
-
-  const handleSave = () => {
-    if (!editedRow) return;
-
-    setData((prev) =>
-      prev.map((row) => (row.id === editedRow.id ? editedRow : row))
-    );
-
-    setEditingId(null);
-    setEditedRow(null);
-  };
-
-  const handleCancel = () => {
-    setEditingId(null);
-    setEditedRow(null);
-  };
-
-  const handleInputChange = (field: keyof DataRow, value: string) => {
-    if (!editedRow) return;
-
-    setEditedRow({
-      ...editedRow,
-      [field]: value
-    });
-  };
 
   /* ---------------- UI ---------------- */
   return (
@@ -196,60 +152,64 @@ export default function ExportData() {
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full">
+
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left">Worker ID</th>
+                <th className="px-4 py-3 text-left">S.No</th>
+                <th className="px-4 py-3 text-left">Mobile Party</th>
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Rank</th>
-                <th className="px-4 py-3 text-left">Location</th>
-                <th className="px-4 py-3 text-left">Contact</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Actions</th>
+                <th className="px-4 py-3 text-left">Contact No.</th>
+                <th className="px-4 py-3 text-left">
+                  Ballot Box Collected & Departed from EVM Room
+                </th>
+                <th className="px-4 py-3 text-left">
+                  Collected Timestamp
+                </th>
+                <th className="px-4 py-3 text-left">
+                  Handed Over at Polling Station
+                </th>
+                <th className="px-4 py-3 text-left">
+                  Handed Over Timestamp
+                </th>
+                <th className="px-4 py-3 text-left">
+                  Location of Mobile Party
+                </th>
               </tr>
             </thead>
 
             <tbody>
-              {paginatedData.map((row) => (
+              {paginatedData.map((row, index) => (
                 <tr key={row.id} className="border-t">
-                  <td className="px-4 py-2">{row.workerId}</td>
-
-                  {editableFields.map((field) => (
-                    <td key={field} className="px-4 py-2">
-                      {editingId === row.id ? (
-                        <input
-                          value={editedRow?.[field] ?? ""}
-                          onChange={(e) =>
-                            handleInputChange(field, e.target.value)
-                          }
-                          className="border px-2 py-1 rounded w-full"
-                        />
-                      ) : (
-                        row[field]
-                      )}
-                    </td>
-                  ))}
-
-                  <td className="px-4 py-2">{row.status}</td>
 
                   <td className="px-4 py-2">
-                    {editingId === row.id ? (
-                      <div className="flex gap-2">
-                        <button onClick={handleSave}>
-                          <Save className="w-4 h-4 text-green-600" />
-                        </button>
-                        <button onClick={handleCancel}>
-                          <X className="w-4 h-4 text-red-600" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => handleEdit(row)}>
-                        <Edit2 className="w-4 h-4 text-blue-600" />
-                      </button>
-                    )}
+                    {(currentPage - 1) * itemsPerPage + index + 1}
                   </td>
+
+                  <td className="px-4 py-2">{row.workerId}</td>
+                  <td className="px-4 py-2">{row.name}</td>
+                  <td className="px-4 py-2">{row.rank}</td>
+                  <td className="px-4 py-2">{row.contact}</td>
+
+                  <td className="px-4 py-2">{row.ballotCollected}</td>
+                  <td className="px-4 py-2">{row.collectedTimestamp}</td>
+
+                  <td className="px-4 py-2">{row.handedOver}</td>
+                  <td className="px-4 py-2">{row.handedOverTimestamp}</td>
+
+                  <td className="px-4 py-2">
+                    <button
+                      onClick={() => navigate("/map-tracking")}
+                      className="text-blue-600 underline"
+                    >
+                      View on Map
+                    </button>
+                  </td>
+
                 </tr>
               ))}
             </tbody>
+
           </table>
         </div>
 
@@ -277,6 +237,7 @@ export default function ExportData() {
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
