@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
-import axios from "axios";
+import api from "../../api/axios";
+import axios from "axios"; // ✅ ADD THIS
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 /* ---------------- TYPES ---------------- */
 interface DataRow {
   id: number;
-  workerId: string; // username
+  workerId: string;
   name: string;
   rank: string;
   contact: string;
@@ -55,8 +56,8 @@ export default function ExportData() {
     }
 
     try {
-      const response = await axios.get(
-        `http://localhost:8000/admin/export-tasks/${selectedDate}`,
+      const response = await api.get(
+        `/admin/export-tasks/${selectedDate}`,
         { responseType: "blob" }
       );
 
@@ -68,8 +69,9 @@ export default function ExportData() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
+
+    } catch (error: unknown) { // ✅ FIXED TYPE
+      if (axios.isAxiosError(error)) { // ✅ CORRECT WAY
         alert(
           error.response?.status === 404
             ? "No data found for selected date"
@@ -109,7 +111,7 @@ export default function ExportData() {
   return (
     <div className="space-y-8">
 
-      {/* ================= EXPORT ================= */}
+      {/* EXPORT */}
       <div className="bg-white p-6 rounded-xl shadow-sm border">
         <h2 className="text-xl font-bold mb-4">Export Task Events</h2>
 
@@ -130,7 +132,7 @@ export default function ExportData() {
         </div>
       </div>
 
-      {/* ================= TABLE ================= */}
+      {/* TABLE */}
       <div className="bg-white rounded-xl shadow-sm border">
 
         {/* Search */}
@@ -160,21 +162,11 @@ export default function ExportData() {
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Rank</th>
                 <th className="px-4 py-3 text-left">Contact No.</th>
-                <th className="px-4 py-3 text-left">
-                  Ballot Box Collected & Departed from EVM Room
-                </th>
-                <th className="px-4 py-3 text-left">
-                  Collected Timestamp
-                </th>
-                <th className="px-4 py-3 text-left">
-                  Handed Over at Polling Station
-                </th>
-                <th className="px-4 py-3 text-left">
-                  Handed Over Timestamp
-                </th>
-                <th className="px-4 py-3 text-left">
-                  Location of Mobile Party
-                </th>
+                <th className="px-4 py-3 text-left">Collected</th>
+                <th className="px-4 py-3 text-left">Collected Time</th>
+                <th className="px-4 py-3 text-left">Handed Over</th>
+                <th className="px-4 py-3 text-left">Handed Time</th>
+                <th className="px-4 py-3 text-left">Location</th>
               </tr>
             </thead>
 
