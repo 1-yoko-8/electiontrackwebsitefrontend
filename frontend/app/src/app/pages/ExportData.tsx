@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import api from "../../api/axios";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 /* ---------------- TYPES ---------------- */
 
@@ -34,12 +34,15 @@ interface Report {
 /* ---------------- COMPONENT ---------------- */
 
 export default function ExportData() {
-  /* -------- STATE -------- */
 
   const [data, setData] = useState<DataRow[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  // 🔥 NEW: date state
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
 
   const itemsPerPage = 10;
 
@@ -60,7 +63,6 @@ export default function ExportData() {
             rank: r.rank ?? "N/A",
             contact: r.contact_number ?? "N/A",
 
-            // 🔥 RAW VALUES (NO YES/NO TRANSFORMATION)
             ballotCollected: r.ballot_box_collected_status ?? "Not Started",
             collectedTimestamp: r.collected_timestamp
               ? new Date(r.collected_timestamp).toLocaleString()
@@ -84,48 +86,72 @@ export default function ExportData() {
     fetchData();
   }, []);
 
-  /* -------- SEARCH -------- */
-
-  const filteredData = useMemo(() => {
-    return data.filter(
-      (row) =>
-        row.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.workerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.rank.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [data, searchTerm]);
-
   /* -------- PAGINATION -------- */
 
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
 
-  const paginatedData = filteredData.slice(
+  const paginatedData = data.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  /* -------- EXPORT -------- */
+
+  const handleExport = async () => {
+    try {
+      const res = await api.get(`/admin/export-tasks/${selectedDate}`, {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `reports_${selectedDate}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+    } catch (err) {
+      console.error("Export failed", err);
+      alert("No data found for selected date");
+    }
+  };
 
   /* -------- UI -------- */
 
   return (
     <div className="space-y-8">
 
-      {/* TABLE */}
       <div className="bg-white rounded-xl shadow-sm border">
 
-        {/* SEARCH */}
-        <div className="p-6 border-b">
-          <input
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search..."
-            className="w-full max-w-md px-4 py-2 border rounded-lg"
-          />
+        {/* HEADER */}
+        <div className="p-6 border-b flex justify-between items-center">
+
+          <h2 className="text-lg font-semibold">Reports</h2>
+
+          <div className="flex items-center gap-3">
+
+            {/* 🔥 DATE PICKER */}
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="border px-3 py-2 rounded-lg"
+            />
+
+            {/* EXPORT BUTTON */}
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg"
+            >
+              <Download size={16} />
+              Export
+            </button>
+
+          </div>
         </div>
 
-        {/* TABLE BODY */}
+        {/* TABLE */}
         {loading ? (
           <div className="p-6 text-center">Loading...</div>
         ) : (
@@ -159,7 +185,6 @@ export default function ExportData() {
                     <td className="px-4 py-2">{row.rank}</td>
                     <td className="px-4 py-2">{row.contact}</td>
 
-                    {/* RAW DB VALUES */}
                     <td className="px-4 py-2">{row.ballotCollected}</td>
                     <td className="px-4 py-2">{row.collectedTimestamp}</td>
 
