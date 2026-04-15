@@ -14,11 +14,11 @@ export default function Login() {
 
   /* 🔥 Redirect if already logged in */
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      navigate("/", { replace: true });
-    }
-  }, [navigate]);
+  const token = localStorage.getItem("token");
+  if (token && window.location.pathname === "/login") {
+    navigate("/", { replace: true });
+  }
+}, [navigate]);
 
   /* 🔥 LOGIN HANDLER */
   const handleLogin = async (e: React.FormEvent) => {

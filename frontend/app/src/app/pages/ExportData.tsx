@@ -11,6 +11,8 @@ interface DataRow {
   rank: string;
   contact: string;
 
+  report_date: string;
+
   ballotCollected: string;
   collectedTimestamp: string;
 
@@ -24,6 +26,8 @@ interface Report {
   rank: string | null;
   contact_number: string | null;
 
+  report_date: string; // ✅ added
+
   ballot_box_collected_status: string | null;
   collected_timestamp: string | null;
 
@@ -34,50 +38,64 @@ interface Report {
 /* ---------------- COMPONENT ---------------- */
 
 export default function ExportData() {
-
   const [data, setData] = useState<DataRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 NEW: date state
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-
   const itemsPerPage = 10;
 
-  /* -------- FETCH -------- */
+  /* ---------------- FETCH ---------------- */
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
 
       try {
-        const res = await api.get<Report[]>("/admin/reports");
+        // ✅ today's date
+        const today = new Date().toISOString().split("T")[0];
 
-        const mapped: DataRow[] = res.data
-          .map((r, index) => ({
-            id: index + 1,
-            workerId: r.username,
-            name: r.name ?? "N/A",
-            rank: r.rank ?? "N/A",
-            contact: r.contact_number ?? "N/A",
+        // ✅ backend filtered request
+        const res = await api.get<Report[]>(
+          `/admin/reports?report_date=${today}`
+        );
 
-            ballotCollected: r.ballot_box_collected_status ?? "Not Started",
-            collectedTimestamp: r.collected_timestamp
-              ? new Date(r.collected_timestamp).toLocaleString()
-              : "N/A",
+        const rawData = Array.isArray(res.data) ? res.data : [];
 
-            handedOver: r.ballot_box_handed_over_status ?? "Not Started",
-            handedOverTimestamp: r.handed_over_timestamp
-              ? new Date(r.handed_over_timestamp).toLocaleString()
-              : "N/A",
-          }))
-          .sort((a, b) => a.workerId.localeCompare(b.workerId));
+        const mapped: DataRow[] = rawData.map((r, index) => ({
+          id: index + 1,
+          workerId: r.username,
+          name: r.name ?? "N/A",
+          rank: r.rank ?? "N/A",
+          contact: r.contact_number ?? "N/A",
+
+          report_date: r.report_date, // ✅ correct
+
+          ballotCollected:
+            r.ballot_box_collected_status ?? "Not Started",
+          collectedTimestamp: r.collected_timestamp
+            ? new Date(r.collected_timestamp).toLocaleString()
+            : "N/A",
+
+          handedOver:
+            r.ballot_box_handed_over_status ?? "Not Started",
+          handedOverTimestamp: r.handed_over_timestamp
+            ? new Date(r.handed_over_timestamp).toLocaleString()
+            : "N/A",
+        }));
+
+        // ✅ sort properly
+        mapped.sort((a, b) =>
+          a.workerId.localeCompare(b.workerId, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          })
+        );
 
         setData(mapped);
+        setCurrentPage(1); // ✅ reset page
       } catch (err) {
         console.error("Failed to fetch reports", err);
+        setData([]);
       } finally {
         setLoading(false);
       }
@@ -86,7 +104,7 @@ export default function ExportData() {
     fetchData();
   }, []);
 
-  /* -------- PAGINATION -------- */
+  /* ---------------- PAGINATION ---------------- */
 
   const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
 
@@ -95,60 +113,49 @@ export default function ExportData() {
     currentPage * itemsPerPage
   );
 
-  /* -------- EXPORT -------- */
+  /* ---------------- EXPORT ---------------- */
 
   const handleExport = async () => {
     try {
-      const res = await api.get(`/admin/export-tasks/${selectedDate}`, {
+      const res = await api.get("/admin/export-tasks", {
         responseType: "blob",
       });
+
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .slice(0, 19);
 
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `reports_${selectedDate}.xlsx`);
+      link.setAttribute("download", `reports_${timestamp}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-
     } catch (err) {
       console.error("Export failed", err);
-      alert("No data found for selected date");
+      alert("Export failed. Please try again.");
     }
   };
 
-  /* -------- UI -------- */
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="space-y-8">
-
       <div className="bg-white rounded-xl shadow-sm border">
 
         {/* HEADER */}
         <div className="p-6 border-b flex justify-between items-center">
-
           <h2 className="text-lg font-semibold">Reports</h2>
 
-          <div className="flex items-center gap-3">
-
-            {/* 🔥 DATE PICKER */}
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="border px-3 py-2 rounded-lg"
-            />
-
-            {/* EXPORT BUTTON */}
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg"
-            >
-              <Download size={16} />
-              Export
-            </button>
-
-          </div>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg"
+          >
+            <Download size={16} />
+            Export
+          </button>
         </div>
 
         {/* TABLE */}
@@ -157,7 +164,6 @@ export default function ExportData() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left">S.No</th>
@@ -165,6 +171,7 @@ export default function ExportData() {
                   <th className="px-4 py-3 text-left">Name</th>
                   <th className="px-4 py-3 text-left">Rank</th>
                   <th className="px-4 py-3 text-left">Contact</th>
+                  <th className="px-4 py-3 text-left">Date</th> {/* ✅ added */}
                   <th className="px-4 py-3 text-left">Collected Status</th>
                   <th className="px-4 py-3 text-left">Collected Time</th>
                   <th className="px-4 py-3 text-left">Handed Over Status</th>
@@ -173,28 +180,21 @@ export default function ExportData() {
               </thead>
 
               <tbody>
-                {paginatedData.map((row, index) => (
+                {paginatedData.map((row) => (
                   <tr key={row.id} className="border-t">
-
-                    <td className="px-4 py-2">
-                      {(currentPage - 1) * itemsPerPage + index + 1}
-                    </td>
-
+                    <td className="px-4 py-2">{row.id}</td>
                     <td className="px-4 py-2">{row.workerId}</td>
                     <td className="px-4 py-2">{row.name}</td>
                     <td className="px-4 py-2">{row.rank}</td>
                     <td className="px-4 py-2">{row.contact}</td>
-
+                    <td className="px-4 py-2">{row.report_date}</td>
                     <td className="px-4 py-2">{row.ballotCollected}</td>
                     <td className="px-4 py-2">{row.collectedTimestamp}</td>
-
                     <td className="px-4 py-2">{row.handedOver}</td>
                     <td className="px-4 py-2">{row.handedOverTimestamp}</td>
-
                   </tr>
                 ))}
               </tbody>
-
             </table>
           </div>
         )}
@@ -207,7 +207,9 @@ export default function ExportData() {
 
           <div className="flex gap-2">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() =>
+                setCurrentPage((p) => Math.max(1, p - 1))
+              }
               disabled={currentPage === 1}
             >
               <ChevronLeft />
@@ -215,7 +217,9 @@ export default function ExportData() {
 
             <button
               onClick={() =>
-                setCurrentPage((p) => Math.min(totalPages, p + 1))
+                setCurrentPage((p) =>
+                  Math.min(totalPages, p + 1)
+                )
               }
               disabled={currentPage === totalPages}
             >
@@ -223,7 +227,6 @@ export default function ExportData() {
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );

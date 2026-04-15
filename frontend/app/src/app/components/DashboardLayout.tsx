@@ -104,8 +104,9 @@ export function DashboardLayout() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    navigate("/login");
-  };
+  localStorage.removeItem("token");
+  navigate("/login", { replace: true });
+};
 
   return (
     <div className="flex min-h-screen bg-gray-50">

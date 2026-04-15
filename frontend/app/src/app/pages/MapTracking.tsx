@@ -25,8 +25,11 @@ export default function MapTracking() {
           </span>
         </CardHeader>
 
-        <CardContent className="p-4">
-          <WorkerMap />
+        {/* ✅ FIX: give map proper height */}
+        <CardContent className="p-0">
+          <div className="w-full h-[500px] lg:h-[600px]">
+            <WorkerMap />
+          </div>
         </CardContent>
       </Card>
 
