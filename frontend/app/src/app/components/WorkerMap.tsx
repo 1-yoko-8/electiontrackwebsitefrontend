@@ -18,8 +18,8 @@ L.Icon.Default.mergeOptions({
 /* ---------------- TYPES ---------------- */
 
 interface Worker {
-  id: string; // username (e.g. mp_001)
-  name: string; // Mobile Party 1
+  id: string;
+  name: string;
   rank: string;
   currentTask: string;
   position: [number, number];
@@ -27,8 +27,6 @@ interface Worker {
   completedAllTasks: boolean;
   phoneNumber?: string | null;
 }
-
-/* API TYPES */
 
 interface GPSPing {
   userId: string;
@@ -40,7 +38,7 @@ interface GPSPing {
 
 interface Report {
   username: string;
-  phone_number: string | null;
+  contact_number: string | null;
   ballot_box_handed_over_status: string;
 }
 
@@ -50,8 +48,6 @@ const extractPartyId = (username: string) => {
   const match = username.match(/\d+/);
   return match ? match[0] : "0";
 };
-
-/* ---------------- STATUS ---------------- */
 
 function getStatus(worker: Worker): "active" | "idle" | "completed" {
   const now = new Date();
@@ -114,9 +110,13 @@ export function WorkerMap() {
 
     const fetchData = async () => {
       try {
+        const today = new Date().toISOString().split("T")[0];
+
         const [gpsRes, reportRes] = await Promise.all([
           api.get<GPSPing[]>("/gps/latest"),
-          api.get<Report[]>("/reports"),
+          api.get<Report[]>(
+            `/admin/reports?report_date=${today}` // ✅ FIXED
+          ),
         ]);
 
         const reportMap = new Map(
@@ -137,7 +137,7 @@ export function WorkerMap() {
             completedAllTasks:
               report?.ballot_box_handed_over_status === "Completed",
 
-            phoneNumber: report?.phone_number ?? null,
+            phoneNumber: report?.contact_number ?? null,
           };
         });
 
@@ -169,7 +169,7 @@ export function WorkerMap() {
 
     mapInstanceRef.current = map;
 
-    setTimeout(() => map.invalidateSize(), 0);
+    setTimeout(() => map.invalidateSize(), 100); // ✅ FIX
   }, []);
 
   /* ---------------- MARKERS ---------------- */
@@ -198,11 +198,11 @@ export function WorkerMap() {
 
         marker.bindPopup(popupContent);
         markersRef.current.set(worker.id, marker);
+      } else {
+        marker.setLatLng(worker.position);
+        marker.setIcon(createCustomIcon(status, partyId));
+        marker.setPopupContent(popupContent);
       }
-
-      marker.setLatLng(worker.position);
-      marker.setIcon(createCustomIcon(status, partyId));
-      marker.setPopupContent(popupContent);
     });
 
     const activeIds = new Set(workers.map((w) => w.id));
@@ -218,39 +218,15 @@ export function WorkerMap() {
   /* ---------------- UI ---------------- */
 
   return (
-    <div className="relative">
-      <style>{`
-        .leaflet-container {
-          height: 600px;
-          width: 100%;
-          border-radius: 12px;
-        }
-      `}</style>
-
-      <div ref={mapRef} style={{ height: "600px", width: "100%" }} />
+    <div className="relative w-full h-full">
+      <div ref={mapRef} className="w-full h-full rounded-xl" />
 
       {/* LEGEND */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: "20px",
-          right: "20px",
-          background: "white",
-          padding: "12px 14px",
-          borderRadius: "10px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-          zIndex: 9999,
-        }}
-      >
-        <div style={{ fontWeight: 600, marginBottom: "6px" }}>
-          Legend
-        </div>
-
-        <div style={{ fontSize: "12px", lineHeight: "18px" }}>
-          <div>🟢 Active</div>
-          <div>🟠 Idle</div>
-          <div>⚫ Completed</div>
-        </div>
+      <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow-md z-[1000] text-xs">
+        <div className="font-semibold mb-1">Legend</div>
+        <div>🟢 Active</div>
+        <div>🟠 Idle</div>
+        <div>⚫ Completed</div>
       </div>
     </div>
   );
