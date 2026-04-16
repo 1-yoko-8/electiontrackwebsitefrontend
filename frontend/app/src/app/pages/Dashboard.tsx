@@ -34,7 +34,6 @@ interface DashboardResponse {
 
 type ColorType = "blue" | "green" | "purple" | "orange" | "indigo";
 
-/* ✅ FIX: define CardProps */
 interface CardProps {
   icon: React.ElementType;
   label: string;
@@ -43,7 +42,6 @@ interface CardProps {
   loading: boolean;
 }
 
-/* ✅ FIX: define StatusSectionProps */
 interface StatusSectionProps {
   title: string;
   data: PollingStatus;
@@ -117,8 +115,6 @@ export default function Dashboard() {
         setDayBeforeStatus(res.data.dayBeforeStatus ?? defaultStatus);
         setPollingDayStatus(res.data.pollingDayStatus ?? defaultStatus);
       } catch (err: unknown) {
-        console.error("API failed:", err);
-
         if (
           typeof err === "object" &&
           err !== null &&
@@ -142,8 +138,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-
-    const interval = setInterval(fetchData, 5000); // ✅ const fix
+    const interval = setInterval(fetchData, 5000);
 
     return () => {
       isMounted = false;
@@ -152,23 +147,25 @@ export default function Dashboard() {
   }, [navigate]);
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="min-h-screen bg-gray-50 p-8 space-y-14">
 
+      {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">
+        <h1 className="text-4xl font-bold text-gray-900">
           Dashboard
         </h1>
-        <p className="text-gray-600">
+        <p className="text-lg text-gray-600 mt-2">
           Monitor polling operations in real-time
         </p>
       </div>
 
-      <div>
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+      {/* DISTRICT OVERVIEW */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900 mb-8">
           District Overview
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <Card icon={MapPin} label="Total Polling Locations"
             value={districtDetails.totalPollingLocations}
             color="blue" loading={loading} />
@@ -187,11 +184,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <StatusSection title="Day Before Polling Status"
-        data={dayBeforeStatus} loading={loading} />
+      {/* STATUS */}
+      <StatusSection
+        title="Day Before Polling Status"
+        data={dayBeforeStatus}
+        loading={loading}
+      />
 
-      <StatusSection title="Polling Day Status"
-        data={pollingDayStatus} loading={loading} />
+      <StatusSection
+        title="Polling Day Status"
+        data={pollingDayStatus}
+        loading={loading}
+      />
     </div>
   );
 }
@@ -208,14 +212,16 @@ function Card({
   const styles = colorClasses[color];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border">
-      <div className={`p-3 w-fit mb-4 rounded-lg ${styles.bg}`}>
-        <Icon className={`w-6 h-6 ${styles.text}`} />
+    <div className="bg-white rounded-2xl shadow-md p-8 border hover:shadow-lg transition">
+
+      <div className={`p-4 w-fit mb-5 rounded-xl ${styles.bg}`}>
+        <Icon className={`w-8 h-8 ${styles.text}`} />
       </div>
 
       <div className="text-center">
-        <p className="text-sm text-gray-600 mb-2">{label}</p>
-        <p className="text-4xl font-bold text-gray-900">
+        <p className="text-base text-gray-600 mb-3">{label}</p>
+
+        <p className="text-5xl font-bold text-gray-900">
           {loading ? "—" : value}
         </p>
       </div>
@@ -231,12 +237,7 @@ function StatusSection({
   loading,
 }: StatusSectionProps) {
 
-  const items: {
-    label: string;
-    value: number;
-    icon: React.ElementType;
-    color: ColorType;
-  }[] = [
+  const items = [
     { label: "Mobile Parties Collected & Departed", value: data.collectedAndDeparted, icon: Package, color: "blue" },
     { label: "Ballot Boxes Collected", value: data.ballotBoxesCollected, icon: Package, color: "green" },
     { label: "Mobile Parties in Transit", value: data.partiesInTransit, icon: Truck, color: "orange" },
@@ -245,23 +246,31 @@ function StatusSection({
   ];
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
+    <div className="space-y-4">
+      <h2 className="text-2xl font-bold text-gray-900 mb-8">
+        {title}
+      </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
         {items.map((item, idx) => {
           const styles = colorClasses[item.color];
 
           return (
-            <div key={idx} className="bg-white rounded-xl shadow-sm p-5 border">
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`p-2 rounded-lg ${styles.bg}`}>
-                  <item.icon className={`w-5 h-5 ${styles.text}`} />
+            <div
+              key={idx}
+              className="bg-white rounded-2xl shadow-md p-6 border hover:shadow-lg transition"
+            >
+              <div className="flex items-center gap-4 mb-4">
+                <div className={`p-3 rounded-xl ${styles.bg}`}>
+                  <item.icon className={`w-6 h-6 ${styles.text}`} />
                 </div>
-                <p className="text-xs text-gray-600">{item.label}</p>
+
+                <p className="text-sm text-gray-600 leading-tight">
+                  {item.label}
+                </p>
               </div>
 
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-4xl font-bold text-gray-900">
                 {loading ? "—" : item.value}
               </p>
             </div>

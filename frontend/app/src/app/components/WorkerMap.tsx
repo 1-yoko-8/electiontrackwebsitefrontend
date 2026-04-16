@@ -5,15 +5,16 @@ import api from "../../api/axios";
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-/* ---------------- FIX DEFAULT ICON ---------------- */
+/* ---------------- SAFE DEFAULT ICON ---------------- */
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: icon,
+const DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
 });
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 /* ---------------- TYPES ---------------- */
 
@@ -57,7 +58,7 @@ function getStatus(worker: Worker): "active" | "idle" | "completed" {
   return "idle";
 }
 
-/* ---------------- SAFE CUSTOM ICON ---------------- */
+/* ---------------- CUSTOM ICON ---------------- */
 
 const createCustomIcon = (status: string, partyId: string) => {
   const color =
@@ -86,7 +87,7 @@ const createCustomIcon = (status: string, partyId: string) => {
         ${partyId}
       </div>
     `,
-    className: "", // IMPORTANT: remove default styles
+    className: "",
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   });
@@ -119,30 +120,51 @@ export function WorkerMap() {
           reportRes.data.map((r) => [r.username, r])
         );
 
-        const mappedWorkers: Worker[] = gpsRes.data
-          .filter((p) => p.latitude && p.longitude) // ✅ remove bad coords
-          .map((ping) => {
-            const report = reportMap.get(ping.userId);
+        const now = new Date();
 
-            return {
-              id: ping.userId,
-              name: `Mobile Party ${extractPartyId(ping.userId)}`,
-              position: [ping.latitude, ping.longitude],
-              lastGPSUpdate: new Date(ping.timestamp),
-              completedAllTasks:
-                report?.ballot_box_handed_over_status === "Completed",
-              phoneNumber: report?.contact_number ?? null,
-            };
-          });
+        const mappedWorkers: Worker[] = gpsRes.data.map((ping) => {
+          const report = reportMap.get(ping.userId);
 
-        if (isMounted) setWorkers(mappedWorkers);
+          const completed =
+            report?.ballot_box_handed_over_status === "Completed";
+
+          /* 🔥 FIX INVALID COORDS */
+          let lat = ping.latitude;
+          let lng = ping.longitude;
+
+          if (!lat || !lng || (lat === 0 && lng === 0)) {
+            lat = 13.0827;
+            lng = 80.2707;
+          }
+
+          return {
+            id: ping.userId,
+            name: `Mobile Party ${extractPartyId(ping.userId)}`,
+            position: [lat, lng],
+            lastGPSUpdate: new Date(ping.timestamp),
+            completedAllTasks: completed,
+            phoneNumber: report?.contact_number ?? null,
+          };
+        });
+
+        /* 🔥 KEEP COMPLETED ONLY FOR 1 MINUTE */
+        const filteredWorkers = mappedWorkers.filter((worker) => {
+          if (!worker.completedAllTasks) return true;
+
+          const diffMs =
+            now.getTime() - worker.lastGPSUpdate.getTime();
+
+          return diffMs <= 60 * 1000; // 1 minute
+        });
+
+        if (isMounted) setWorkers(filteredWorkers);
       } catch (err) {
         console.error("Fetch failed", err);
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 10000); // ✅ reduced load
+    const interval = setInterval(fetchData, 10000);
 
     return () => {
       isMounted = false;
@@ -187,7 +209,7 @@ export function WorkerMap() {
 
       if (!marker) {
         marker = L.marker(worker.position, {
-          icon: createCustomIcon(status, partyId), // ✅ working icon
+          icon: createCustomIcon(status, partyId),
         }).addTo(map);
 
         marker.bindPopup(popupContent);
@@ -199,8 +221,9 @@ export function WorkerMap() {
       }
     });
 
-    // remove old markers
+    /* 🔥 REMOVE OLD MARKERS */
     const activeIds = new Set(workers.map((w) => w.id));
+
     markersRef.current.forEach((marker, id) => {
       if (!activeIds.has(id)) {
         marker.remove();
@@ -208,7 +231,7 @@ export function WorkerMap() {
       }
     });
 
-    // AUTO FIT MAP TO MARKERS
+    /* 🔥 AUTO FIT */
     if (workers.length > 0) {
       const bounds = L.latLngBounds(workers.map((w) => w.position));
       map.fitBounds(bounds, { padding: [50, 50] });
