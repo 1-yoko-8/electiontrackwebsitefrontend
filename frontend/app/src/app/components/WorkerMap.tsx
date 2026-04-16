@@ -5,9 +5,9 @@ import api from "../../api/axios";
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-/* ---------------- LEAFLET ICON FIX ---------------- */
+/* ---------------- FIX DEFAULT ICON ---------------- */
 
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+delete (L.Icon.Default.prototype as any)._getIconUrl;
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: icon,
@@ -20,8 +20,6 @@ L.Icon.Default.mergeOptions({
 interface Worker {
   id: string;
   name: string;
-  rank: string;
-  currentTask: string;
   position: [number, number];
   lastGPSUpdate: Date;
   completedAllTasks: boolean;
@@ -59,7 +57,7 @@ function getStatus(worker: Worker): "active" | "idle" | "completed" {
   return "idle";
 }
 
-/* ---------------- ICON ---------------- */
+/* ---------------- SAFE CUSTOM ICON ---------------- */
 
 const createCustomIcon = (status: string, partyId: string) => {
   const color =
@@ -70,7 +68,6 @@ const createCustomIcon = (status: string, partyId: string) => {
       : "#6b7280";
 
   return L.divIcon({
-    className: "custom-marker",
     html: `
       <div style="
         width: 34px;
@@ -89,6 +86,7 @@ const createCustomIcon = (status: string, partyId: string) => {
         ${partyId}
       </div>
     `,
+    className: "", // IMPORTANT: remove default styles
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   });
@@ -103,7 +101,7 @@ export function WorkerMap() {
 
   const [workers, setWorkers] = useState<Worker[]>([]);
 
-  /* ---------------- FETCH API ---------------- */
+  /* ---------------- FETCH ---------------- */
 
   useEffect(() => {
     let isMounted = true;
@@ -114,41 +112,37 @@ export function WorkerMap() {
 
         const [gpsRes, reportRes] = await Promise.all([
           api.get<GPSPing[]>("/gps/latest"),
-          api.get<Report[]>(
-            `/admin/reports?report_date=${today}` // ✅ FIXED
-          ),
+          api.get<Report[]>(`/admin/reports?report_date=${today}`),
         ]);
 
         const reportMap = new Map(
           reportRes.data.map((r) => [r.username, r])
         );
 
-        const mappedWorkers: Worker[] = gpsRes.data.map((ping) => {
-          const report = reportMap.get(ping.userId);
+        const mappedWorkers: Worker[] = gpsRes.data
+          .filter((p) => p.latitude && p.longitude) // ✅ remove bad coords
+          .map((ping) => {
+            const report = reportMap.get(ping.userId);
 
-          return {
-            id: ping.userId,
-            name: `Mobile Party ${extractPartyId(ping.userId)}`,
-            rank: "Field Worker",
-            currentTask: ping.currentTask,
-            position: [ping.latitude, ping.longitude],
-            lastGPSUpdate: new Date(ping.timestamp),
-
-            completedAllTasks:
-              report?.ballot_box_handed_over_status === "Completed",
-
-            phoneNumber: report?.contact_number ?? null,
-          };
-        });
+            return {
+              id: ping.userId,
+              name: `Mobile Party ${extractPartyId(ping.userId)}`,
+              position: [ping.latitude, ping.longitude],
+              lastGPSUpdate: new Date(ping.timestamp),
+              completedAllTasks:
+                report?.ballot_box_handed_over_status === "Completed",
+              phoneNumber: report?.contact_number ?? null,
+            };
+          });
 
         if (isMounted) setWorkers(mappedWorkers);
       } catch (err) {
-        console.error("Failed to fetch worker data", err);
+        console.error("Fetch failed", err);
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 10000); // ✅ reduced load
 
     return () => {
       isMounted = false;
@@ -169,7 +163,7 @@ export function WorkerMap() {
 
     mapInstanceRef.current = map;
 
-    setTimeout(() => map.invalidateSize(), 100); // ✅ FIX
+    setTimeout(() => map.invalidateSize(), 100);
   }, []);
 
   /* ---------------- MARKERS ---------------- */
@@ -193,7 +187,7 @@ export function WorkerMap() {
 
       if (!marker) {
         marker = L.marker(worker.position, {
-          icon: createCustomIcon(status, partyId),
+          icon: createCustomIcon(status, partyId), // ✅ working icon
         }).addTo(map);
 
         marker.bindPopup(popupContent);
@@ -205,23 +199,28 @@ export function WorkerMap() {
       }
     });
 
+    // remove old markers
     const activeIds = new Set(workers.map((w) => w.id));
-
     markersRef.current.forEach((marker, id) => {
       if (!activeIds.has(id)) {
         marker.remove();
         markersRef.current.delete(id);
       }
     });
+
+    // AUTO FIT MAP TO MARKERS
+    if (workers.length > 0) {
+      const bounds = L.latLngBounds(workers.map((w) => w.position));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
   }, [workers]);
 
   /* ---------------- UI ---------------- */
 
   return (
-    <div className="relative w-full h-full">
+    <div className="w-full h-screen">
       <div ref={mapRef} className="w-full h-full rounded-xl" />
 
-      {/* LEGEND */}
       <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow-md z-[1000] text-xs">
         <div className="font-semibold mb-1">Legend</div>
         <div>🟢 Active</div>

@@ -1,135 +1,126 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Lock, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import api from "../../api/axios";
-import { AxiosError } from "axios";
 
-export default function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+/* 🔥 CORRECT ICON FIX (NO require) */
+import iconRetina from "leaflet/dist/images/marker-icon-2x.png";
+import icon from "leaflet/dist/images/marker-icon.png";
+import shadow from "leaflet/dist/images/marker-shadow.png";
 
-  const navigate = useNavigate();
+delete (L.Icon.Default.prototype as any)._getIconUrl;
 
-  /* 🔥 Redirect if already logged in */
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: iconRetina,
+  iconUrl: icon,
+  shadowUrl: shadow,
+});
+
+type Worker = {
+  id: number;
+  name: string;
+  position: [number, number];
+};
+
+export default function MapView() {
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+
+  /* ================= MAP INIT ================= */
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token && window.location.pathname === "/login") {
-      navigate("/", { replace: true });
-    }
-  }, [navigate]);
+    if (!mapRef.current || mapInstanceRef.current) return;
 
-  /* 🔥 LOGIN HANDLER */
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+    const map = L.map(mapRef.current).setView([13.0827, 80.2707], 10);
 
-    try {
-      const res = await api.post("/admin/login", {
-        username: username.trim(),
-        password: password.trim(),
-      });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
+    }).addTo(map);
 
-      const token = res.data.access_token;
-      localStorage.setItem("token", token);
+    mapInstanceRef.current = map;
 
-      navigate("/", { replace: true });
+    console.log("✅ Map initialized");
 
-    } catch (err: unknown) {
-      const error = err as AxiosError;
-      if (error.response?.status === 401) {
-        setError("Invalid username or password");
-      } else {
-        setError("Something went wrong. Try again.");
+    return () => {
+      map.remove(); // cleanup (important)
+    };
+  }, []);
+
+  /* ================= FETCH DATA ================= */
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await api.get("/gps/latest");
+
+        console.log("📡 RAW GPS:", res.data);
+
+        const mapped: Worker[] = res.data.map((item: any) => {
+          let lat = item.latitude;
+          let lng = item.longitude;
+
+          /* 🔥 FORCE FIX INVALID DATA */
+          if (!lat || !lng || (lat === 0 && lng === 0)) {
+            lat = 13.0827;
+            lng = 80.2707;
+          }
+
+          return {
+            id: item.userId,
+            name: `Worker ${item.userId}`,
+            position: [lat, lng],
+          };
+        });
+
+        console.log("✅ PROCESSED:", mapped);
+
+        setWorkers(mapped);
+      } catch (err) {
+        console.error("❌ API ERROR:", err);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  /* ================= MARKERS ================= */
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    console.log("📍 Workers:", workers);
+
+    /* 🔥 CLEAR OLD MARKERS */
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker) {
+        map.removeLayer(layer);
+      }
+    });
+
+    if (workers.length === 0) return;
+
+    const bounds: L.LatLngExpression[] = [];
+
+    workers.forEach((worker) => {
+      console.log("➡️ Adding marker:", worker.position);
+
+      L.marker(worker.position)
+        .addTo(map)
+        .bindPopup(worker.name);
+
+      bounds.push(worker.position);
+    });
+
+    /* 🔥 AUTO FIT ALL MARKERS */
+    map.fitBounds(bounds, { padding: [50, 50] });
+
+  }, [workers]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl w-full max-w-md p-8">
-
-        {/* HEADER */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4 shadow-inner">
-            <Lock className="w-8 h-8 text-blue-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">
-            ElecTrack
-          </h1>
-          <p className="text-gray-500 text-sm">Admin Login Portal</p>
-        </div>
-
-        {/* FORM */}
-        <form onSubmit={handleLogin} className="space-y-5">
-
-          {/* ERROR */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* USERNAME */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-5">
-              Username
-            </label>
-
-            <div className="flex items-center border border-gray-300 rounded-lg px-5 focus-within:ring-2 focus-within:ring-blue-500 transition">
-              <User className="w-5 h-5 text-gray-400 mr-3 shrink-0" />
-              <input
-                type="text"
-                value={username}
-                autoFocus
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  setError("");
-                }}
-                className="w-full py-3 outline-none bg-transparent"
-                placeholder="Enter username"
-                required
-              />
-            </div>
-          </div>
-
-          {/* PASSWORD */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-
-            <div className="flex items-center border border-gray-300 rounded-lg px-5 focus-within:ring-2 focus-within:ring-blue-500 transition">
-              <Lock className="w-5 h-5 text-gray-400 mr-3 shrink-0" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError("");
-                }}
-                className="w-full py-3 outline-none bg-transparent"
-                placeholder="Enter password"
-                required
-              />
-            </div>
-          </div>
-
-          {/* BUTTON */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-
-        </form>
-      </div>
+    <div className="h-screen w-full overflow-hidden">
+      <div ref={mapRef} className="h-full w-full" />
     </div>
   );
 }
