@@ -161,7 +161,7 @@ export function WorkerMap() {
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
-    const map = L.map(mapRef.current).setView([13.0827, 80.2707], 12);
+    const map = L.map(mapRef.current).setView([9.9252, 78.1198], 12);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap",
