@@ -24,32 +24,36 @@ A web dashboard that lets election administrators monitor field workers in real 
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
 
 ### Setup
-\```bash
+
+​```bash
 cd frontend/app
 npm install
 npm run dev
-\```
+​```
 
 The app runs at `http://localhost:5173` by default.
 
 ### Environment Variables
+
 Copy `.env.example` to `.env` inside `frontend/app` (defaults to the live backend, or point it at your local backend instead):
 
-\```
+​```
 VITE_API_BASE_URL=https://electiontrackwebsitebackend.onrender.com
-\```
+​```
 
 ### Build for production
-\```bash
+
+​```bash
 npm run build
-\```
+​```
 
 ## Project Structure
 
-\```
+​```
 frontend/app/
 ├── src/
 │   ├── api/           # Axios instance & API config
@@ -57,7 +61,7 @@ frontend/app/
 │   │   ├── components/  # Shared UI components (map, sidebar, cards, etc.)
 │   │   └── pages/       # Route-level pages (Dashboard, MapTracking, ExportData, ...)
 │   └── styles/
-\```
+​```
 
 ## Backend
 
