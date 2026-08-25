@@ -1,72 +1,82 @@
 # ElectionTrack — Admin Dashboard
 
-A web dashboard that lets election administrators monitor field workers in real time on election day — live GPS tracking, polling station status, task-day scheduling, dataset uploads, and exportable reports.
+A web dashboard that enables election administrators to monitor field workers in real time on election day. The platform provides live GPS tracking, polling station monitoring, task-day scheduling, dataset management, and exportable reports.
 
 ## Features
 
-- **Live map tracking** — real-time GPS location of field workers on an interactive map (Leaflet)
-- **Dashboard overview** — polling locations, stations, mobile parties, and ballot box counts at a glance
-- **Task-day scheduling** — set and manage the official task/election day
-- **Dataset upload & management** — import worker/polling data (Excel/CSV) and browse/edit it in-app
-- **Data export** — export tracked field data (ballot collection, handover status, timestamps) for reporting
-- **Authenticated admin access** — protected routes, token-based login
+* **Live Map Tracking** — Track the real-time GPS locations of field workers using an interactive map powered by Leaflet.
+* **Dashboard Overview** — View polling locations, polling stations, mobile parties, and ballot box counts at a glance.
+* **Task-Day Scheduling** — Set and manage the official election or task day.
+* **Dataset Upload & Management** — Import worker and polling data from Excel or CSV files, then browse and edit the data within the application.
+* **Data Export** — Export tracked field data, including ballot collection, handover status, and timestamps, for reporting and analysis.
+* **Authenticated Admin Access** — Secure administrative routes with token-based authentication.
 
 ## Tech Stack
 
-- **React 19** + **TypeScript** + **Vite**
-- **React Router v7** for routing
-- **Tailwind CSS v4** + **Radix UI** components
-- **Leaflet / React-Leaflet** for live map tracking
-- **Axios** for API communication
-- **Recharts** for data visualization
-- **SheetJS (xlsx)** for spreadsheet import/export
+* **React 19** + **TypeScript** + **Vite**
+* **React Router v7** for routing
+* **Tailwind CSS v4** + **Radix UI** for the user interface
+* **Leaflet / React-Leaflet** for real-time map tracking
+* **Axios** for API communication
+* **Recharts** for data visualization
+* **SheetJS (`xlsx`)** for spreadsheet import and export
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
+* Node.js 18 or later
 
 ### Setup
 
-​```bash
+```bash
 cd frontend/app
 npm install
 npm run dev
-​```
+```
 
-The app runs at `http://localhost:5173` by default.
+The application runs at `http://localhost:5173` by default.
 
-### Environment Variables
+## Environment Variables
 
-Copy `.env.example` to `.env` inside `frontend/app` (defaults to the live backend, or point it at your local backend instead):
+Copy `.env.example` to `.env` inside `frontend/app`.
 
-​```
+By default, the application connects to the deployed backend:
+
+```env
 VITE_API_BASE_URL=https://electiontrackwebsitebackend.onrender.com
-​```
+```
 
-### Build for production
+You can also update this value to point to a locally running backend.
 
-​```bash
+## Build for Production
+
+```bash
 npm run build
-​```
+```
 
 ## Project Structure
 
-​```
+```text
 frontend/app/
 ├── src/
-│   ├── api/           # Axios instance & API config
+│   ├── api/                 # Axios instance and API configuration
 │   ├── app/
-│   │   ├── components/  # Shared UI components (map, sidebar, cards, etc.)
-│   │   └── pages/       # Route-level pages (Dashboard, MapTracking, ExportData, ...)
-│   └── styles/
-​```
+│   │   ├── components/      # Shared UI components (maps, sidebar, cards, etc.)
+│   │   └── pages/           # Route-level pages (Dashboard, MapTracking, ExportData, etc.)
+│   └── styles/              # Global styles
+```
 
 ## Backend
 
-This is the frontend for the ElectionTrack platform. It communicates with a separate backend API (FastAPI) that handles authentication, worker tracking, and data storage.
+This repository contains the frontend for the ElectionTrack platform. It communicates with a separate **FastAPI** backend responsible for:
+
+* Authentication and authorization
+* Field worker GPS tracking
+* Polling and ballot status management
+* Dataset processing and storage
+* Data export and reporting
 
 ---
 
-*Built as a real-time election-day monitoring tool for administrators to track field worker activity, polling status, and ballot handling.*
+*Built as a real-time election-day monitoring platform that helps administrators track field worker activity, polling status, and ballot handling.*
